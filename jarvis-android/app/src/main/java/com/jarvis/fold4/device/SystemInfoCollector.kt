@@ -70,7 +70,6 @@ class SystemInfoCollector(private val context: Context) {
         val (online, networkType) = connectivity()
 
         val temperatureC: Float? = try {
-            context.getSystemService(android.os.PowerManager::class.java)?.let { null } // no public API
             thermalProbe()
         } catch (e: Exception) { null }
 

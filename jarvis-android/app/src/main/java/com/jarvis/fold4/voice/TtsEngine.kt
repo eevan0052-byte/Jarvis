@@ -29,6 +29,8 @@ class TtsEngine(context: Context) {
             }
             override fun onDone(utteranceId: String?) = finished()
             override fun onError(utteranceId: String?) = finished()
+            @Deprecated("Deprecated in Java")
+            override fun onError(utteranceId: String?, errorCode: Int) = finished()
         })
     }
 

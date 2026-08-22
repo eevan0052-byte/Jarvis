@@ -79,6 +79,7 @@ dependencies {
     // Network (weather + optional cloud LLM)
     implementation(libs.okhttp)
     implementation(libs.kotlinx.coroutines.android)
+    implementation(libs.kotlinx.coroutines.play.services)
 
     // Tests
     testImplementation(libs.junit)
