@@ -16,7 +16,7 @@ abstract class MemoryDatabase : RoomDatabase() {
     companion object {
         fun build(context: Context): MemoryDatabase =
             Room.databaseBuilder(context, MemoryDatabase::class.java, "jarvis.db")
-                .fallbackToDestructiveMigration(false)
+                .fallbackToDestructiveMigration()
                 .build()
     }
 }

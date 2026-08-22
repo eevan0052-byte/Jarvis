@@ -271,6 +271,7 @@ object ResponseComposer {
     }
 
     private fun pick(vararg s: String): String = s[Math.floorMod((Math.random() * s.size).toInt(), s.size)]
-    private fun article(w: String): String = if (w.firstOrNull()?.lowercaseChar() in "aeiou") "an $w" else "a $w"
+    private fun article(w: String): String =
+        if ((w.firstOrNull()?.lowercaseChar() ?: 'x') in "aeiou") "an $w" else "a $w"
     private fun truncate(s: String, n: Int): String = if (s.length > n) s.take(n - 1) + "…" else s
 }

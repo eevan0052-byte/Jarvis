@@ -25,3 +25,5 @@ server-config.enc.json
 server-config.key
 .env
 *.keystore
+.android/
+.arena/

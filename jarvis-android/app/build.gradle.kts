@@ -43,6 +43,11 @@ android {
     }
 }
 
+ksp {
+    // Room exige un répertoire d'export du schéma quand exportSchema=true.
+    arg("room.schemaLocation", "$projectDir/schemas")
+}
+
 dependencies {
     // Compose
     implementation(platform(libs.androidx.compose.bom))
@@ -65,7 +70,7 @@ dependencies {
     implementation(libs.androidx.camera.camera2)
     implementation(libs.androidx.camera.lifecycle)
     implementation(libs.androidx.camera.view)
-    implementation(libs.mlkit.object)
+    implementation(libs.mlkit.objdetect)
     implementation(libs.mlkit.face)
     implementation(libs.mlkit.text)
     implementation(libs.mlkit.barcode)

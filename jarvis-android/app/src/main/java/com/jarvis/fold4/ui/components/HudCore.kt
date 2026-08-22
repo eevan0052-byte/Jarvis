@@ -15,12 +15,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.graphics.drawscope.Stroke
 import com.jarvis.fold4.core.JarvisCore
 import com.jarvis.fold4.core.Mode
 import com.jarvis.fold4.ui.theme.JarvisColors
 import kotlin.math.PI
+import kotlin.math.abs
 import kotlin.math.cos
 import kotlin.math.sin
 import kotlin.random.Random
@@ -60,7 +62,7 @@ fun HudCore(modifier: Modifier = Modifier, compact: Boolean = false) {
             Mode.LISTENING -> 1f + voiceLevel
             Mode.THINKING -> 1.3f
             Mode.PROCESSING -> 1.1f
-            Mode.SPEAKING -> 0.9f + 0.3f * sin(pulse * 2 * PI.toFloat()).absoluteValue
+            Mode.SPEAKING -> 0.9f + 0.3f * abs(sin(pulse * 2.0 * PI).toFloat())
             Mode.VISION -> 0.8f
             Mode.ALERT -> 0.7f
             Mode.BOOTING -> 1.6f
@@ -108,7 +110,7 @@ fun HudCore(modifier: Modifier = Modifier, compact: Boolean = false) {
         if (mode == Mode.LISTENING) {
             val r = base * 1.24f
             val pts = 48
-            val path = android.graphics.Path()
+            val path = Path()
             for (i in 0..pts) {
                 val a = (i.toFloat() / pts) * (2 * PI).toFloat() - (PI / 2).toFloat()
                 val v = voiceLevel * (0.5f + 0.5f * sin(i * 1.7f + pulse * 12f))
@@ -139,7 +141,7 @@ fun HudCore(modifier: Modifier = Modifier, compact: Boolean = false) {
         // inner rotating triangle
         rotate(rot * 1.4f) {
             val rr = nr * 0.62f
-            val path = android.graphics.Path()
+            val path = Path()
             for (i in 0..3) {
                 val a = (i / 3f) * (2 * PI).toFloat()
                 val px = cx + cos(a) * rr

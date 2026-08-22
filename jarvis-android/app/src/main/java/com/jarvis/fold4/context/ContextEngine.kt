@@ -20,8 +20,7 @@ class ContextEngine(
         while (history.size > MAX_HISTORY) history.removeFirst()
     }
 
-    /** Build the live snapshot used by providers and the HUD. */
-    fun build(query: String = ""): ContextSnapshot {
+    suspend fun build(query: String = ""): ContextSnapshot {
         val st = JarvisCore.state.value
         val prefs = memory.preferences()
 

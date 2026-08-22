@@ -30,8 +30,8 @@ class VoiceEngine(private val context: Context) {
         suspendCancellableCoroutine { cont ->
             val sr = SpeechRecognizer.createSpeechRecognizer(context)
             var done = false
-            val finish: (String?) -> Unit = { text ->
-                if (done) return@Unit
+            fun finish(text: String?) {
+                if (done) return
                 done = true
                 try { sr.destroy() } catch (_: Exception) {}
                 JarvisCore.updateVoice { it.copy(listening = false) }

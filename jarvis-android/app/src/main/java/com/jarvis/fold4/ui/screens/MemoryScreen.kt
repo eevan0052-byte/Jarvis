@@ -18,6 +18,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -37,6 +38,7 @@ fun MemoryScreen(vm: MainViewModel) {
     var query by remember { mutableStateOf("") }
     var selectedCat by remember { mutableStateOf("all") }
     var editing by remember { mutableStateOf<MemoryEntity?>(null) }
+    val scope = rememberCoroutineScope()
 
     val cats = listOf("all", "fact", "preference", "reminder", "routine", "object", "device", "command", "mission", "note", "observation")
 
@@ -77,7 +79,7 @@ fun MemoryScreen(vm: MainViewModel) {
                         Text(e.title, color = JarvisColors.Text, fontSize = 13.sp)
                         Row {
                             TextButton(onClick = { editing = e }) { Text("EDIT", color = JarvisColors.TextFaint, fontSize = 9.sp) }
-                            TextButton(onClick = { androidx.compose.runtime.rememberCoroutineScope().launch { vm.memory.delete(e.id) } }) {
+                            TextButton(onClick = { scope.launch { vm.memory.delete(e.id) } }) {
                                 Text("DELETE", color = JarvisColors.Red, fontSize = 9.sp)
                             }
                         }
@@ -95,7 +97,6 @@ fun MemoryScreen(vm: MainViewModel) {
             onDismissRequest = { editing = null },
             confirmButton = {
                 TextButton(onClick = {
-                    val scope = androidx.compose.runtime.rememberCoroutineScope()
                     scope.launch { vm.memory.update(e.id) { it.copy(title = title, body = body) } }
                     editing = null
                 }) { Text("SAVE", color = JarvisColors.BlueSoft) }

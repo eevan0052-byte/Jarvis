@@ -3,6 +3,9 @@ package com.jarvis.fold4.biometrics
 import com.jarvis.fold4.JarvisApp
 import org.json.JSONArray
 import org.json.JSONObject
+import kotlin.math.abs
+import kotlin.math.ln
+import kotlin.math.sqrt
 
 /**
  * Speaker recognition — TRANSPARENT acoustic voiceprint.
@@ -21,20 +24,23 @@ class SpeakerProfiles {
 
     private val crypto = JarvisApp.instance.bioCrypto
 
-    data class Profile(val name: String, val createdAt: Long, val samples: List<FloatArray>)
-
     data class FeatureVector(
         val energy: FloatArray,   // 10-bucket RMS contour, normalized
+        val energyStd: Float,     // contour variance — syllabic dynamics
         val zcr: Float,           // zero-crossing rate, normalized
         val centroid: Float,      // spectral centroid (derivative-based)
         val pitch: Float,         // autocorrelation pitch, log-normalized
     )
 
+    data class Profile(val name: String, val createdAt: Long, val samples: List<FeatureVector>)
+
     fun profiles(): List<String> = load().map { it.name }
 
     fun enroll(name: String, samples: List<FloatArray>) {
+        val features = samples.mapNotNull(::extract)
+        if (features.isEmpty()) throw IllegalStateException("Could not extract a voice profile from the recording. Speak clearly and try again.")
         val profiles = load().filterNot { it.name == name }.toMutableList()
-        profiles += Profile(name, System.currentTimeMillis(), samples.mapNotNull(::extract))
+        profiles += Profile(name, System.currentTimeMillis(), features)
         persist(profiles)
     }
 
@@ -68,10 +74,7 @@ class SpeakerProfiles {
                 Profile(
                     o.getString("name"),
                     o.getLong("createdAt"),
-                    (0 until samples.length()).map { j ->
-                        val a = samples.getJSONArray(j)
-                        FloatArray(a.length()) { k -> a.getDouble(k).toFloat() }
-                    },
+                    (0 until samples.length()).map { j -> featureFromJson(samples.getJSONObject(j)) },
                 )
             }
         } catch (e: Exception) { emptyList() }
@@ -82,15 +85,34 @@ class SpeakerProfiles {
         profiles.forEach { p ->
             val o = JSONObject().put("name", p.name).put("createdAt", p.createdAt)
             val samples = JSONArray()
-            p.samples.forEach { f ->
-                val a = JSONArray()
-                f.forEach { a.put(it.toDouble()) }
-                samples.put(a)
-            }
+            p.samples.forEach { f -> samples.put(featureToJson(f)) }
             o.put("samples", samples)
             arr.put(o)
         }
         crypto.save("speaker", arr.toString())
+    }
+
+    private fun featureToJson(f: FeatureVector): JSONObject {
+        val energy = JSONArray()
+        f.energy.forEach { energy.put(it.toDouble()) }
+        return JSONObject()
+            .put("energy", energy)
+            .put("energyStd", f.energyStd.toDouble())
+            .put("zcr", f.zcr.toDouble())
+            .put("centroid", f.centroid.toDouble())
+            .put("pitch", f.pitch.toDouble())
+    }
+
+    private fun featureFromJson(o: JSONObject): FeatureVector {
+        val energyArr = o.getJSONArray("energy")
+        val energy = FloatArray(energyArr.length()) { i -> energyArr.getDouble(i).toFloat() }
+        return FeatureVector(
+            energy = energy,
+            energyStd = o.optDouble("energyStd", 0.0).toFloat(),
+            zcr = o.getDouble("zcr").toFloat(),
+            centroid = o.getDouble("centroid").toFloat(),
+            pitch = o.getDouble("pitch").toFloat(),
+        )
     }
 
     /* ── feature extraction (pure, testable) ────────────────────────────── */
@@ -106,7 +128,7 @@ class SpeakerProfiles {
             for (b in 0 until buckets) {
                 var sum = 0f
                 for (i in b * per until (b + 1) * per) sum += samples[i] * samples[i]
-                energy[b] = kotlin.math.sqrt(sum / per)
+                energy[b] = sqrt(sum / per)
             }
             val emax = energy.maxOrNull() ?: 1e-9f
             val energyNorm = energy.map { it / emax }.toFloatArray()
@@ -115,7 +137,9 @@ class SpeakerProfiles {
             for (i in 1 until samples.size) {
                 if ((samples[i] >= 0) != (samples[i - 1] >= 0)) zcr++
             }
-            val zcrNorm = (zcr.toFloat() / samples.size * 400f).coerceAtMost(1f)
+            // raw scaled value — NOT clamped (noise ≈ 12, speech ≈ 2-4);
+            // clamping happens on the DIFFERENCE in similarity()
+            val zcrNorm = zcr.toFloat() / samples.size * 24f
 
             val frame = 2048
             val centroids = mutableListOf<Float>()
@@ -135,7 +159,9 @@ class SpeakerProfiles {
             }
             val centroid = if (centroids.isEmpty()) 0f else centroids.average().toFloat()
 
-            val seg = samples.copyOfRange(samples.size / 5, samples.size * 7 / 10)
+            val from = samples.size / 5
+            val to = samples.size * 7 / 10
+            val seg = samples.copyOfRange(from, to)
             var pitch = 0f
             val minLag = SAMPLE_RATE / 400
             val maxLag = SAMPLE_RATE / 60
@@ -153,19 +179,27 @@ class SpeakerProfiles {
                 }
                 if (best > 0) pitch = SAMPLE_RATE.toFloat() / bestLag
             }
-            val pitchNorm = ((kotlin.math.ln(pitch + 1f) - 6f) / 3f).coerceIn(0f, 1f)
+            // log-normalize over the voiced range (~60–400 Hz)
+            val pitchNorm = ((ln(pitch + 1f) - ln(61f)) / (ln(401f) - ln(61f))).coerceIn(0f, 1f)
 
-            return FeatureVector(energyNorm, zcrNorm, centroid, pitchNorm)
+            // energy contour variance — speech has syllabic dynamics, noise does not
+            val mean = energyNorm.average().toFloat()
+            var variance = 0f
+            for (v in energyNorm) variance += (v - mean) * (v - mean)
+            val energyStd = sqrt(variance / energyNorm.size)
+
+            return FeatureVector(energyNorm, energyStd, zcrNorm, centroid, pitchNorm)
         }
 
         fun similarity(a: FeatureVector, b: FeatureVector): Int {
             var e = 0f
             for (i in a.energy.indices) e += (a.energy[i] - b.energy[i]) * (a.energy[i] - b.energy[i])
-            val energySim = (1f - kotlin.math.sqrt(e / a.energy.size)).coerceAtLeast(0f)
-            val zcrSim = (1f - kotlin.math.abs(a.zcr - b.zcr)).coerceAtLeast(0f)
-            val centSim = (1f - kotlin.math.abs(a.centroid - b.centroid) * 4f).coerceAtLeast(0f)
-            val pitchSim = (1f - kotlin.math.abs(a.pitch - b.pitch) * 2f).coerceAtLeast(0f)
-            return ((0.45f * energySim + 0.2f * zcrSim + 0.2f * centSim + 0.15f * pitchSim) * 100f).toInt()
+            val energySim = (1f - sqrt(e / a.energy.size)).coerceAtLeast(0f)
+            val stdSim = (1f - abs(a.energyStd - b.energyStd) * 4f).coerceAtLeast(0f)
+            val zcrSim = (1f - abs(a.zcr - b.zcr) * 0.12f).coerceAtLeast(0f)
+            val centSim = (1f - abs(a.centroid - b.centroid) * 4f).coerceAtLeast(0f)
+            val pitchSim = (1f - abs(a.pitch - b.pitch) * 2f).coerceAtLeast(0f)
+            return ((0.30f * energySim + 0.15f * stdSim + 0.15f * zcrSim + 0.20f * centSim + 0.20f * pitchSim) * 100f).toInt()
         }
     }
 }

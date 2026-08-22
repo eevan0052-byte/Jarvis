@@ -109,11 +109,10 @@ class SystemInfoCollector(private val context: Context) {
         return true to type
     }
 
-    /** Battery temperature via the thermal framework (device-dependent). */
     private fun thermalProbe(): Float? {
         return try {
-            val bm = context.getSystemService(Context.BATTERY_SERVICE) as? BatteryManager ?: return null
-            val t = bm.getIntProperty(BatteryManager.BATTERY_PROPERTY_TEMPERATURE) // API 35
+            val intent = context.registerReceiver(null, android.content.IntentFilter(android.content.Intent.ACTION_BATTERY_CHANGED))
+            val t = intent?.getIntExtra(BatteryManager.EXTRA_TEMPERATURE, Int.MIN_VALUE) ?: Int.MIN_VALUE
             if (t == Int.MIN_VALUE) null else t / 10f
         } catch (e: Exception) { null }
     }

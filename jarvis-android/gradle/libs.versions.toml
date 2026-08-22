@@ -39,7 +39,7 @@ androidx-camera-core = { group = "androidx.camera", name = "camera-core", versio
 androidx-camera-camera2 = { group = "androidx.camera", name = "camera-camera2", version.ref = "cameraX" }
 androidx-camera-lifecycle = { group = "androidx.camera", name = "camera-lifecycle", version.ref = "cameraX" }
 androidx-camera-view = { group = "androidx.camera", name = "camera-view", version.ref = "cameraX" }
-mlkit-object = { group = "com.google.mlkit", name = "object-detection", version.ref = "mlkitObject" }
+mlkit-objdetect = { group = "com.google.mlkit", name = "object-detection", version.ref = "mlkitObject" }
 mlkit-face = { group = "com.google.mlkit", name = "face-detection", version.ref = "mlkitFace" }
 mlkit-text = { group = "com.google.mlkit", name = "text-recognition", version.ref = "mlkitText" }
 mlkit-barcode = { group = "com.google.mlkit", name = "barcode-scanning", version.ref = "mlkitBarcode" }

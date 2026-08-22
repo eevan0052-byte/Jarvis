@@ -7,6 +7,10 @@ import com.jarvis.fold4.memory.MemoryDatabase
 import com.jarvis.fold4.memory.MemoryRepository
 import com.jarvis.fold4.privacy.AuditLogger
 import com.jarvis.fold4.security.SecretStore
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 
 /**
  * Application root — service composition (no DI framework needed at this scale).
@@ -30,6 +34,7 @@ class JarvisApp : Application() {
     override fun onCreate() {
         super.onCreate()
         instance = this
+        _appScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
         // ── data layer ─────────────────────────────────────────────────────
         val db = MemoryDatabase.build(this)
@@ -44,8 +49,13 @@ class JarvisApp : Application() {
 
         // ── AI ─────────────────────────────────────────────────────────────
         providers = ProviderRegistry(secretStore)
-        audit.record("system", "application started")
+        appScope.launch { audit.record("system", "application started") }
     }
+
+    val appScope: CoroutineScope
+        get() = _appScope
+
+    private lateinit var _appScope: CoroutineScope
 
     companion object {
         lateinit var instance: JarvisApp

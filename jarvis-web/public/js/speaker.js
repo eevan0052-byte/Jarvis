@@ -42,12 +42,13 @@ export function extractFeatures(samples, sampleRate = 44100) {
   const emax = Math.max(...energy) || 1e-9;
   const energyNorm = energy.map(e => e / emax);
 
-  // zero-crossing rate
+  // zero-crossing rate (raw scaled value — NOT clamped: noise ≈ 12, speech ≈ 2-4;
+  // the clamping happens on the DIFFERENCE in similarity())
   let zcr = 0;
   for (let i = 1; i < samples.length; i++) {
     if ((samples[i] >= 0) !== (samples[i - 1] >= 0)) zcr++;
   }
-  const zcrNorm = Math.min(1, zcr / samples.length * 400);
+  const zcrNorm = zcr / samples.length * 24;
 
   // spectral centroid via simple FFT-less approximation on windowed frames
   const frame = 2048;
@@ -75,9 +76,14 @@ export function extractFeatures(samples, sampleRate = 44100) {
     }
     if (best > 0) pitch = sampleRate / bestLag;
   }
-  const pitchNorm = Math.min(1, Math.max(0, (Math.log2(pitch + 1) - 6) / 3));
+  // log-normalize over the voiced range (~60–400 Hz)
+  const pitchNorm = Math.min(1, Math.max(0, (Math.log(pitch + 1) - Math.log(61)) / (Math.log(401) - Math.log(61))));
 
-  return { energy: energyNorm, zcr: zcrNorm, centroid, pitch: pitchNorm };
+  // energy contour variance — speech has syllabic dynamics, noise does not
+  const mean = energyNorm.reduce((a, b) => a + b, 0) / energyNorm.length;
+  const energyStd = Math.sqrt(energyNorm.reduce((a, b) => a + (b - mean) ** 2, 0) / energyNorm.length);
+
+  return { energy: energyNorm, energyStd, zcr: zcrNorm, centroid, pitch: pitchNorm };
 }
 
 function similarity(a, b) {
@@ -85,10 +91,11 @@ function similarity(a, b) {
   let e = 0;
   for (let i = 0; i < a.energy.length; i++) e += (a.energy[i] - b.energy[i]) ** 2;
   const energySim = Math.max(0, 1 - Math.sqrt(e / a.energy.length));
-  const zcrSim = Math.max(0, 1 - Math.abs(a.zcr - b.zcr));
+  const stdSim = Math.max(0, 1 - Math.abs((a.energyStd ?? 0) - (b.energyStd ?? 0)) * 4);
+  const zcrSim = Math.max(0, 1 - Math.abs(a.zcr - b.zcr) * 0.12);
   const centSim = Math.max(0, 1 - Math.abs(a.centroid - b.centroid) * 4);
   const pitchSim = Math.max(0, 1 - Math.abs(a.pitch - b.pitch) * 2);
-  return Math.round((0.45 * energySim + 0.2 * zcrSim + 0.2 * centSim + 0.15 * pitchSim) * 100);
+  return Math.round((0.30 * energySim + 0.15 * stdSim + 0.15 * zcrSim + 0.20 * centSim + 0.20 * pitchSim) * 100);
 }
 
 /* ── profile management ───────────────────────────────────────────────────── */

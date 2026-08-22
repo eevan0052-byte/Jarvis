@@ -27,10 +27,13 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.tasks.await
+import java.util.concurrent.Executors
+import kotlin.coroutines.resume
+import kotlin.coroutines.resumeWithException
 
 /**
  * VisionEngine — CameraX + ML Kit, fully on-device.
@@ -65,10 +68,11 @@ class VisionEngine(private val context: Context) {
 
     private var analysis: ImageAnalysis? = null
     private var provider: ProcessCameraProvider? = null
+    private val analysisExecutor = Executors.newSingleThreadExecutor()
 
     /** Start camera bound to the given view + lifecycle. Throws on denial. */
     suspend fun start(previewView: PreviewView, lifecycleOwner: LifecycleOwner) {
-        val cameraProvider = ProcessCameraProvider.getInstance(context).await()
+        val cameraProvider = awaitCameraProvider()
         provider = cameraProvider
 
         val preview = Preview.Builder().build().also {
@@ -77,7 +81,7 @@ class VisionEngine(private val context: Context) {
         analysis = ImageAnalysis.Builder()
             .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
             .build()
-            .also { it.setAnalyzer(scope.coroutineContext + Dispatchers.Default, ::analyze) }
+            .also { it.setAnalyzer(analysisExecutor, ::analyze) }
 
         val selector = CameraSelector.DEFAULT_BACK_CAMERA
         cameraProvider.unbindAll()
@@ -93,6 +97,19 @@ class VisionEngine(private val context: Context) {
         JarvisCore.updateVision { it.copy(active = false, detections = emptyList(), faces = emptyList()) }
         if (JarvisCore.state.value.mode == Mode.VISION) JarvisCore.setMode(Mode.IDLE)
     }
+
+    /** Awaits the CameraX provider on its own executor (no extra deps). */
+    private suspend fun awaitCameraProvider(): ProcessCameraProvider =
+        suspendCancellableCoroutine { cont ->
+            val future = ProcessCameraProvider.getInstance(context)
+            future.addListener({
+                try {
+                    cont.resume(future.get())
+                } catch (e: Exception) {
+                    cont.resumeWithException(e)
+                }
+            }, ContextCompat.getMainExecutor(context))
+        }
 
     private fun analyze(imageProxy: ImageProxy) {
         val media = imageProxy.image
@@ -178,6 +195,7 @@ class VisionEngine(private val context: Context) {
         objectDetector.close()
         faceDetector.close()
         textRecognizer.close()
+        analysisExecutor.shutdown()
     }
 }
 
