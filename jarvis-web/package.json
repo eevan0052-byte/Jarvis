@@ -1,0 +1,14 @@
+{
+  "name": "jarvis-fold4",
+  "version": "1.0.0",
+  "description": "JARVIS — personal AI operating layer for the Samsung Galaxy Z Fold4 (web companion + reference implementation)",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "start": "node server.js",
+    "test": "node --test tests/"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

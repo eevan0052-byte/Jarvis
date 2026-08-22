@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">JARVIS</string>
+    <string name="perm_mic_title">Microphone</string>
+    <string name="perm_mic_desc">Used for voice commands, the voice-activity meter and optional voice enrollment. Audio is processed live and never recorded to storage.</string>
+    <string name="perm_camera_title">Camera</string>
+    <string name="perm_camera_desc">Used only while Vision Mode is open, with a visible indicator. Frames are analyzed on-device and never uploaded.</string>
+</resources>

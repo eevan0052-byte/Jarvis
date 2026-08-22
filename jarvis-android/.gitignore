@@ -1,0 +1,10 @@
+# Ignore Gradle build artifacts
+.gradle/
+build/
+local.properties
+.idea/
+*.iml
+.kotlin/
+captures/
+.externalNativeBuild/
+.cxx/

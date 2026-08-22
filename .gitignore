@@ -1,0 +1,27 @@
+# Fichiers générés / de travail
+JARVIS-*.zip
+image-search/
+*.log
+
+# Node
+node_modules/
+dist/
+build/
+.npm/
+
+# Gradle / Android Studio
+.gradle/
+.idea/
+*.iml
+.kotlin/
+local.properties
+captures/
+.externalNativeBuild/
+.cxx/
+app/build/
+
+# Secrets (jamais versionnés)
+server-config.enc.json
+server-config.key
+.env
+*.keystore

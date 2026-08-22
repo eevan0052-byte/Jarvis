@@ -1,0 +1,42 @@
+# JARVIS — build cloud (GitHub Actions)
+# Workflow: push → ./gradlew test + assembleDebug → APK artifact
+# Tu déclenches aussi manuellement depuis l'onglet Actions (bouton "Run workflow")
+name: Android CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+  workflow_dispatch:        # bouton manuel depuis le navigateur du Fold4
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Récupérer le code
+        uses: actions/checkout@v4
+
+      - name: JDK 17 (Temurin)
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      # Cache Gradle → les builds suivants prennent ~2 min au lieu de ~10
+      - name: Setup Gradle + cache
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Tests unitaires (NLU, biométrie, automation)
+        run: ./gradlew test --no-daemon
+        working-directory: jarvis-android
+
+      - name: Compiler l'APK debug
+        run: ./gradlew assembleDebug --no-daemon
+        working-directory: jarvis-android
+
+      - name: Publier l'APK (artifact téléchargeable)
+        uses: actions/upload-artifact@v4
+        with:
+          name: jarvis-debug-apk
+          path: jarvis-android/app/build/outputs/apk/debug/app-debug.apk
+          retention-days: 30

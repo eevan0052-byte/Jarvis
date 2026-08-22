@@ -1,0 +1,247 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#04070d">
+<meta name="description" content="JARVIS — a personal AI operating layer. On-device voice, vision, memory and automation.">
+<title>JARVIS — Personal AI Operating Layer</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Ccircle cx='32' cy='32' r='16' fill='none' stroke='%2357b8ff' stroke-width='2'/%3E%3Ccircle cx='32' cy='32' r='6' fill='%2357b8ff'/%3E%3Ccircle cx='32' cy='32' r='26' fill='none' stroke='%2346e0e8' stroke-width='1' opacity='0.5' stroke-dasharray='8 6'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="css/base.css">
+<link rel="stylesheet" href="css/layout.css">
+<link rel="stylesheet" href="css/hud.css">
+<link rel="stylesheet" href="css/vision.css">
+<link rel="stylesheet" href="css/panels.css">
+</head>
+<body>
+
+<!-- ═══════════ BOOT ═══════════ -->
+<div id="boot-overlay" aria-hidden="false">
+  <canvas id="boot-canvas"></canvas>
+  <div id="boot-content">
+    <div id="boot-brand">JARVIS</div>
+    <div id="boot-sub">Personal AI Operating Layer · v1.0 · Fold-optimized</div>
+    <div id="boot-checks"></div>
+    <div id="boot-progress">INITIALIZING…</div>
+  </div>
+</div>
+
+<!-- ═══════════ APP ═══════════ -->
+<div id="app" class="fold-open">
+  <canvas id="core-canvas"></canvas>
+  <div id="scanlines"></div>
+
+  <!-- top status -->
+  <header id="topbar" role="banner">
+    <div id="brand"><span class="mark"></span><span id="brand-name">JARVIS</span></div>
+    <span class="chip" id="chip-status"><span class="dot"></span><span id="chip-status-txt">ONLINE</span></span>
+    <span class="chip" id="chip-system"><span class="dot"></span>SYSTEM READY</span>
+    <span class="chip" id="chip-voice"><span class="dot"></span>VOICE <span id="chip-voice-txt">—</span></span>
+    <span class="chip" id="chip-vision"><span class="dot"></span>VISION <span id="chip-vision-txt">—</span></span>
+    <span class="chip" id="chip-net"><span class="dot"></span>NET <span id="chip-net-txt">—</span></span>
+    <span class="chip" id="chip-mem"><span class="dot"></span>MEM <span id="chip-mem-txt">0</span></span>
+    <div id="formfactor-toggle" class="row" role="group" aria-label="Form factor">
+      <button class="btn ghost" id="ff-cover" title="Cover screen (folded)">▯ COVER</button>
+      <button class="btn ghost" id="ff-open" title="Unfolded">▭ UNFOLD</button>
+      <button class="btn ghost" id="ff-ambient" title="Desk / ambient">◐ AMBIENT</button>
+    </div>
+  </header>
+
+  <!-- status line -->
+  <div id="hud-status-line"></div>
+
+  <!-- left rail: context -->
+  <aside id="rail-left" aria-label="Context">
+    <div class="rail-panel glass">
+      <div class="glass-title">Temporal</div>
+      <div class="glass-body">
+        <div class="ctx-card"><div class="head">Local time</div><div class="big" id="p-time">—</div></div>
+        <div class="ctx-card"><div class="head">Date</div><div id="p-date">—</div></div>
+      </div>
+    </div>
+    <div class="rail-panel glass">
+      <div class="glass-title">Environment</div>
+      <div class="glass-body" id="p-weather-body">
+        <div class="metric-row"><span class="k">Weather</span><span class="v" id="p-weather">—</span></div>
+        <div class="metric-row"><span class="k">Location</span><span class="v" id="p-location">not granted</span></div>
+      </div>
+    </div>
+    <div class="rail-panel glass">
+      <div class="glass-title">Device</div>
+      <div class="glass-body">
+        <div class="metric-row"><span class="k">Battery</span><span class="v" id="p-battery">—</span></div>
+        <div class="bar" id="p-battery-bar"><i></i></div>
+        <div class="metric-row"><span class="k">Network</span><span class="v" id="p-net">—</span></div>
+        <div class="metric-row"><span class="k">Form factor</span><span class="v" id="p-fold">unfolded</span></div>
+      </div>
+    </div>
+    <div class="rail-panel glass">
+      <div class="glass-title">Focus</div>
+      <div class="glass-body" id="p-focus">Inactive</div>
+    </div>
+    <div class="rail-panel glass">
+      <div class="glass-title">Upcoming</div>
+      <div class="glass-body" id="p-reminders">No reminders</div>
+    </div>
+  </aside>
+
+  <!-- center zone -->
+  <main id="center-zone">
+    <div id="ambient-display">
+      <div id="ambient-clock">—</div>
+      <div id="ambient-date">—</div>
+      <div id="ambient-weather">—</div>
+    </div>
+    <div id="greeting-line" aria-live="polite"></div>
+  </main>
+
+  <!-- right rail: modules -->
+  <aside id="rail-right" aria-label="Modules">
+    <div class="rail-panel glass">
+      <div class="glass-title">AI Modules</div>
+      <div class="glass-body" id="p-modules"></div>
+    </div>
+    <div class="rail-panel glass">
+      <div class="glass-title">System Stream</div>
+      <div class="glass-body"><div id="syslog-stream" aria-live="off"></div></div>
+    </div>
+    <div class="rail-panel glass">
+      <div class="glass-title">Security</div>
+      <div class="glass-body" id="p-security"></div>
+    </div>
+  </aside>
+
+  <!-- bottom zone -->
+  <footer id="bottom-zone">
+    <div id="suggestion-row" aria-live="polite"></div>
+    <div id="controls-row">
+      <button class="ctl-btn" id="ctl-voice" title="Voice command"><span class="ico">◉</span>Voice</button>
+      <button class="ctl-btn" id="ctl-vision" title="Vision Mode"><span class="ico">◎</span>Vision</button>
+      <button class="ctl-btn" id="ctl-memory" title="Memory Center"><span class="ico">◈</span>Memory</button>
+      <button class="ctl-btn" id="ctl-automation" title="Automation"><span class="ico">⚙</span>Auto</button>
+      <button class="ctl-btn" id="ctl-system" title="System Command Center"><span class="ico">⌘</span>System</button>
+      <button class="ctl-btn" id="ctl-settings" title="Settings"><span class="ico">✛</span>Settings</button>
+      <button id="voice-orb" title="Tap to speak — hold for continuous" aria-label="Speak to JARVIS">◈</button>
+    </div>
+  </footer>
+
+  <!-- conversation -->
+  <div id="conversation" class="glass" role="log" aria-live="polite">
+    <div id="conv-messages"></div>
+    <div id="conv-input-row">
+      <button class="btn ghost" id="conv-mic" title="Voice input">◉</button>
+      <input id="conv-input" type="text" placeholder="Type a command…  (Ctrl+K palette)" autocomplete="off" aria-label="Command input">
+      <button class="btn primary" id="conv-send">Execute</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════ VISION OVERLAY ═══════════ -->
+<div id="vision-overlay" role="dialog" aria-label="Vision Mode">
+  <div id="vision-video-wrap">
+    <video id="vision-video" playsinline muted></video>
+    <div id="vision-hud">
+      <div id="vision-scanline"></div>
+      <div class="vcorner tl"></div><div class="vcorner tr"></div>
+      <div class="vcorner bl"></div><div class="vcorner br"></div>
+      <div id="vision-camera-indicator">CAMERA ACTIVE — ON-DEVICE ANALYSIS</div>
+      <div id="vision-metrics"></div>
+      <div id="vision-results" class="glass">
+        <div class="glass-title">Detection Feed</div>
+        <div class="glass-body" id="vision-feed">Model loading…</div>
+      </div>
+    </div>
+    <div id="vision-topbar">
+      <span id="vision-title">Vision Mode</span>
+      <span id="vision-status">standby</span>
+      <div id="vision-actions">
+        <button class="btn" id="vis-ocr">Read Text</button>
+        <button class="btn" id="vis-analyze">Analyze Scene</button>
+        <button class="btn" id="vis-identify">Identify</button>
+        <button class="btn" id="vis-remember">Remember Object</button>
+        <button class="btn danger" id="vis-close">Close Vision</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════ PANELS (sheets) ═══════════ -->
+<div class="sheet-backdrop" id="panel-memory"><div class="sheet" role="dialog" aria-label="Memory Center">
+  <div class="sheet-head"><h2>◈ Memory Center <span class="sub" id="mem-count"></span></h2><button class="sheet-x" data-close>✕</button></div>
+  <div class="sheet-body">
+    <div class="row spread" style="margin-bottom:10px">
+      <input id="mem-search" type="text" placeholder="Search memory…">
+      <button class="btn" id="mem-add">+ Add</button>
+      <button class="btn" id="mem-export">Export</button>
+      <button class="btn" id="mem-import">Import</button>
+    </div>
+    <div id="memory-layout">
+      <div class="cat-list" id="mem-cats"></div>
+      <div class="mem-list" id="mem-list"></div>
+    </div>
+  </div>
+</div></div>
+
+<div class="sheet-backdrop" id="panel-privacy"><div class="sheet" role="dialog" aria-label="Privacy Center">
+  <div class="sheet-head"><h2>⌁ Privacy Center</h2><button class="sheet-x" data-close>✕</button></div>
+  <div class="sheet-body" id="privacy-body"></div>
+</div></div>
+
+<div class="sheet-backdrop" id="panel-system"><div class="sheet" role="dialog" aria-label="System Command Center">
+  <div class="sheet-head"><h2>⌘ System Command Center <span class="sub">live telemetry · REAL vs UNAVAILABLE clearly marked</span></h2><button class="sheet-x" data-close>✕</button></div>
+  <div class="sheet-body" id="system-body"></div>
+</div></div>
+
+<div class="sheet-backdrop" id="panel-automation"><div class="sheet" role="dialog" aria-label="Automation Engine">
+  <div class="sheet-head"><h2>⚙ Automation Engine</h2><button class="sheet-x" data-close>✕</button></div>
+  <div class="sheet-body" id="automation-body"></div>
+</div></div>
+
+<div class="sheet-backdrop" id="panel-settings"><div class="sheet" role="dialog" aria-label="Settings">
+  <div class="sheet-head"><h2>✛ Settings</h2><button class="sheet-x" data-close>✕</button></div>
+  <div class="sheet-body" id="settings-body"></div>
+</div></div>
+
+<div class="sheet-backdrop" id="panel-briefing"><div class="sheet" id="briefing-sheet" role="dialog" aria-label="Smart Briefing">
+  <div class="sheet-head"><h2>◈ Smart Briefing <span class="sub" id="briefing-date"></span></h2><button class="sheet-x" data-close>✕</button></div>
+  <div class="sheet-body" id="briefing-body"></div>
+</div></div>
+
+<!-- confirm -->
+<div class="sheet-backdrop" id="confirm-dialog"><div class="sheet" role="alertdialog" aria-label="Confirmation">
+  <div class="sheet-head"><h2 id="confirm-title">Confirm</h2></div>
+  <div class="sheet-body">
+    <div id="confirm-body"></div>
+    <div id="confirm-actions">
+      <button class="btn" id="confirm-no">Cancel</button>
+      <button class="btn primary" id="confirm-ok">Confirm</button>
+    </div>
+  </div>
+</div></div>
+
+<!-- ═══════════ COMMAND PALETTE ═══════════ -->
+<div id="command-palette" role="dialog" aria-label="Command palette">
+  <div id="palette-box">
+    <input id="palette-input" type="text" placeholder="Type a command — “analyze this”, “system status”, “run night protocol”…" autocomplete="off">
+    <div id="palette-list"></div>
+  </div>
+</div>
+
+<!-- ═══════════ ONBOARDING ═══════════ -->
+<div id="onboarding" aria-label="Onboarding">
+  <div id="ob-core-wrap"><canvas id="ob-core" aria-hidden="true"></canvas></div>
+  <div id="ob-content"></div>
+</div>
+
+<!-- ═══════════ NOTICES / TOASTS ═══════════ -->
+<div id="notice-center" aria-live="polite"></div>
+<div id="toasts" aria-live="polite"></div>
+
+<noscript><p style="color:#dfe9f5;font-family:monospace;padding:40px">JARVIS requires JavaScript.</p></noscript>
+
+<script src="vendor/onnx/ort.min.js"></script>
+<script src="vendor/tesseract/tesseract.min.js"></script>
+<script type="module" src="js/main.js"></script>
+</body>
+</html>
