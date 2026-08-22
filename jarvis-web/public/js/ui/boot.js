@@ -1,6 +1,8 @@
 /**
  * Boot sequence — real subsystem probes, cinematic presentation.
  * Every check is a genuine capability probe; results are shown honestly.
+ * Hard watchdog: no check may hang the boot — each one has a timeout and
+ * the sequence always completes.
  */
 import { State, emit } from './../state.js';
 import { $, sleep } from './../utils.js';
@@ -9,15 +11,21 @@ import { sttAvailable, ttsAvailable } from './../speech.js';
 import { loadModel } from './../vision.js';
 import { faceApiAvailable } from './../faceid.js';
 
+const withTimeout = (promise, ms) =>
+  Promise.race([
+    promise,
+    new Promise((resolve) => setTimeout(() => resolve({ __timeout: true }), ms)),
+  ]);
+
 const CHECKS = [
-  { id: 'audio', label: 'AUDIO SYNTHESIS CORE', run: async () => (typeof AudioContext !== 'undefined' || typeof webkitAudioContext !== 'undefined') ? 'ok' : 'warn' },
-  { id: 'tts', label: 'VOICE SYNTHESIS', run: async () => ttsAvailable() ? 'ok' : 'warn' },
-  { id: 'stt', label: 'SPEECH RECOGNITION', run: async () => sttAvailable() ? 'ok' : 'warn' },
-  { id: 'camera', label: 'CAMERA BUS', run: async () => (navigator.mediaDevices?.getUserMedia ? 'ok' : 'warn') },
-  { id: 'vision-model', label: 'VISION MODEL (ON-DEVICE)', run: async (p) => { try { await loadModel((pct, msg) => p(pct, msg)); return 'ok'; } catch { return 'err'; } } },
-  { id: 'memory', label: 'MEMORY INDEX', run: async () => { const { Memory } = await import('./../memory.js'); State.patch({ memory: { count: Memory.all().length } }); return 'ok'; } },
-  { id: 'storage', label: 'SECURE STORAGE', run: async () => { try { localStorage.setItem('__probe', '1'); localStorage.removeItem('__probe'); return 'ok'; } catch { return 'err'; } } },
-  { id: 'network', label: 'NETWORK LINK', run: async () => { try { const ctl = new AbortController(); const t = setTimeout(() => ctl.abort(), 4000); const r = await fetch('/api/health', { signal: ctl.signal }); clearTimeout(t); return r.ok ? 'ok' : 'warn'; } catch { return navigator.onLine ? 'warn' : 'err'; } } },
+  { id: 'audio', label: 'AUDIO SYNTHESIS CORE', timeoutMs: 8000, run: async () => (typeof AudioContext !== 'undefined' || typeof webkitAudioContext !== 'undefined') ? 'ok' : 'warn' },
+  { id: 'tts', label: 'VOICE SYNTHESIS', timeoutMs: 8000, run: async () => ttsAvailable() ? 'ok' : 'warn' },
+  { id: 'stt', label: 'SPEECH RECOGNITION', timeoutMs: 8000, run: async () => sttAvailable() ? 'ok' : 'warn' },
+  { id: 'camera', label: 'CAMERA BUS', timeoutMs: 8000, run: async () => (navigator.mediaDevices?.getUserMedia ? 'ok' : 'warn') },
+  { id: 'vision-model', label: 'VISION MODEL (ON-DEVICE)', timeoutMs: 45000, run: async (p) => { try { await loadModel((pct, msg) => p(pct, msg)); return 'ok'; } catch { return 'err'; } } },
+  { id: 'memory', label: 'MEMORY INDEX', timeoutMs: 8000, run: async () => { const { Memory } = await import('./../memory.js'); State.patch({ memory: { count: Memory.all().length } }); return 'ok'; } },
+  { id: 'storage', label: 'SECURE STORAGE', timeoutMs: 8000, run: async () => { try { localStorage.setItem('__probe', '1'); localStorage.removeItem('__probe'); return 'ok'; } catch { return 'err'; } } },
+  { id: 'network', label: 'NETWORK LINK', timeoutMs: 8000, run: async () => { try { const ctl = new AbortController(); const t = setTimeout(() => ctl.abort(), 4000); const r = await fetch('/api/health', { signal: ctl.signal }); clearTimeout(t); return r.ok ? 'ok' : 'warn'; } catch { return navigator.onLine ? 'warn' : 'err'; } } },
 ];
 
 export async function runBoot() {
@@ -48,24 +56,26 @@ export async function runBoot() {
     stEl.textContent = 'CHECKING';
     if (c.id === 'vision-model') {
       bar.style.display = 'block';
-      const res = await c.run((pct, msg) => {
-        bar.querySelector('i').style.width = pct + '%';
-        stEl.textContent = msg.toUpperCase().slice(0, 26);
-        progress.textContent = `LOADING VISION MODEL ${Math.round(pct)}%`;
-      });
-      results[c.id] = res;
-      row.className = 'boot-check ' + res;
-      stEl.textContent = res === 'ok' ? 'READY' : res === 'warn' ? 'DEGRADED' : 'UNAVAILABLE';
+      const res = await withTimeout(
+        c.run((pct, msg) => {
+          bar.querySelector('i').style.width = pct + '%';
+          stEl.textContent = msg.toUpperCase().slice(0, 26);
+          progress.textContent = `LOADING VISION MODEL ${Math.round(pct)}%`;
+        }),
+        c.timeoutMs);
+      results[c.id] = res?.__timeout ? 'err' : res;
+      row.className = 'boot-check ' + (res?.__timeout ? 'err' : res);
+      stEl.textContent = res?.__timeout ? 'TIMEOUT — SKIPPED' : res === 'ok' ? 'READY' : res === 'warn' ? 'DEGRADED' : 'UNAVAILABLE';
       bar.style.display = 'none';
       if (res === 'ok') visionLoaded = true;
     } else {
-      const res = await c.run();
-      results[c.id] = res;
-      row.className = 'boot-check ' + res;
-      stEl.textContent = res === 'ok' ? 'READY' : res === 'warn' ? 'LIMITED' : 'UNAVAILABLE';
+      const res = await withTimeout(c.run(), c.timeoutMs);
+      results[c.id] = res?.__timeout ? 'err' : res;
+      row.className = 'boot-check ' + (res?.__timeout ? 'err' : res);
+      stEl.textContent = res?.__timeout ? 'TIMEOUT' : res === 'ok' ? 'READY' : res === 'warn' ? 'LIMITED' : 'UNAVAILABLE';
     }
     progress.textContent = `INITIALIZING ${Math.round(((i + 1) / CHECKS.length) * 100)}%`;
-    await sleep(160);
+    await sleep(120);
   }
 
   State.patch({

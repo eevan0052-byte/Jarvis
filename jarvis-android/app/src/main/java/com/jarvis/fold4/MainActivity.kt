@@ -82,8 +82,18 @@ private fun AppRoot(vm: MainViewModel, isUnfolded: Boolean) {
     val app = remember { JarvisApp.instance }
     var onboardingDone by remember { mutableStateOf<Boolean?>(null) }
     var screen by remember { mutableStateOf("home") }
+    var loadError by remember { mutableStateOf<String?>(null) }
 
-    LaunchedEffect(Unit) { onboardingDone = app.memory.preferences().onboardingDone }
+    LaunchedEffect(Unit) {
+        // Jamais de spinner infini : en cas de souci de stockage, on passe
+        // directement à l'onboarding (l'app reste utilisable).
+        onboardingDone = try {
+            app.memory.preferences().onboardingDone
+        } catch (e: Exception) {
+            loadError = "Storage init degraded: ${e.message ?: e.javaClass.simpleName}"
+            false
+        }
+    }
 
     when {
         onboardingDone == null -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
